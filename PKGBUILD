@@ -1,4 +1,4 @@
-# Maintainer: Tuo Nome <tua@email.com>
+# Maintainer: sayoridev <sayoridevuwu@gmail.com>
 pkgname=rofi-wayland-hud
 pkgver=1.0.0
 pkgrel=1
@@ -10,7 +10,7 @@ depends=('rofi' 'kdotool' 'sdbus-cpp')
 makedepends=('cmake' 'gcc')
 provides=('rofi-wayland-hud')
 conflicts=('rofi-wayland-hud')
-options=('!debug') # <-- Questa riga dice a makepkg di saltare la generazione del pacchetto di debug
+options=('!debug')
 source=()
 
 build() {
