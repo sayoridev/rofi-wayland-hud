@@ -1,0 +1,23 @@
+# cmake trash
+build/
+bin/
+lib/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# temp file
+*.o
+*.a
+*.so
+*.log
+rofi-wayland-hud

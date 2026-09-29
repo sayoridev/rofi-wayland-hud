@@ -10,7 +10,7 @@ depends=('rofi' 'kdotool' 'sdbus-cpp')
 makedepends=('cmake' 'gcc')
 provides=('rofi-wayland-hud')
 conflicts=('rofi-wayland-hud')
-options=('!debug')
+options=('!debug') 
 source=()
 
 build() {
