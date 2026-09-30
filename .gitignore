@@ -21,3 +21,6 @@ compile_commands.json
 *.so
 *.log
 rofi-wayland-hud
+
+#compiled_packages
+*.pkg.tar.zst
