@@ -16,6 +16,11 @@ A stable, instant-trigger **Global Menu HUD** for **KDE Plasma 6 on Wayland**, p
 - 🎨 **Clean Rofi output formatting**  
   Provides readable window titles, fallback messages, and application icons.
 
+## 🗺️ Roadmap & Contributing
+
+Want to see what's planned or contribute to `rofi-wayland-hud`?  
+Check out my **[TODO & Roadmap](TODO.md)** for upcoming features, multi-compositor support, and UI enhancements.
+
 ## 📋 Dependencies
 
 To build and run `rofi-wayland-hud`, you need the following packages:
