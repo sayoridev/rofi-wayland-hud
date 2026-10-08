@@ -7,23 +7,24 @@ This document outlines planned features, structural improvements, and platform s
 ## 🏎️ Phase 1: Modular Architecture & Multi-Compositor Support
 > *Goal: Abstract the window tracking mechanism so the HUD works seamlessly across various Wayland compositors beyond KDE Plasma.*
 
-- [ ] **Refactor `WindowTracker` to Polymorphic Strategy Pattern**
-  - Define an abstract C++ interface/base class `WindowTracker`.
-  - Move current `kdotool` implementation into `KWinTracker : public WindowTracker`.
-- [ ] **Implement Hyprland Support**
-  - Create `HyprlandTracker` using `hyprctl activewindow -j` for zero-delay active window PID and title extraction.
-- [ ] **Implement Sway / wlroots Support**
-  - Create `SwayTracker` using `swaymsg -t get_tree` IPC socket calls.
-  - Explore native `wlr-foreign-toplevel-management-unstable-v1` integration.
-- [ ] **Automatic Compositor Auto-Detection**
-  - Parse `$XDG_CURRENT_DESKTOP` and `$WAYLAND_DISPLAY` at startup to dynamically instantiate the appropriate tracker.
+- [x] **Refactor `WindowTracker` to Polymorphic Strategy Pattern**
+  - Defined abstract C++ base class `WindowTracker`.
+  - Moved and optimized `kdotool` implementation into `KWinTracker : public WindowTracker`.
+- [x] **Implement Hyprland Support**
+  - Created `HyprlandTracker` using `hyprctl activewindow -j` for active window PID, class, and title extraction.
+- [x] **Implement Sway / wlroots Support**
+  - Created `SwayTracker` using `swaymsg -t get_tree` IPC socket calls.
+- [x] **Automatic Compositor Auto-Detection**
+  - Created `TrackerFactory` checking `$HYPRLAND_INSTANCE_SIGNATURE`, `$SWAYSOCK`, and `$XDG_CURRENT_DESKTOP` at startup to dynamically instantiate the appropriate tracker.
 
 ---
 
 ## 🎨 Phase 2: User Experience & Customization
 
-- [ ] **Keyboard Shortcut Hints in Rofi Menu**
-  - Parse D-Bus menu accelerator strings (e.g., `Ctrl+S`, `Alt+F4`) and display them on the right side of the Rofi entry (`\0meta\x1f...` or custom styling).
+- [x] **Keyboard Shortcut Hints in Rofi Menu**
+  - Parsed D-Bus menu accelerator strings (e.g., `Ctrl+S`, `Alt+F4`, `Ctrl+Shift+P`) and displayed them formatted alongside the entry name, with searchable `meta` tags.
+- [x] **Submenu Breadcrumbs Navigation**
+  - Implemented visual breadcrumb indicators (e.g., `File > Export > PDF`) for nested submenus.
 - [ ] **Enhanced Application Icon Resolution**
   - Fallback icon matching using `.desktop` files when D-Bus doesn't provide an explicit icon name.
 - [ ] **Config File Support (`~/.config/rofi-hud/config.ini` or `.json`)**
@@ -31,19 +32,19 @@ This document outlines planned features, structural improvements, and platform s
     - Custom Rofi theme overrides.
     - Ignored application blacklists (e.g., ignore Desktop background or Panels).
     - Custom fallback message text.
-- [ ] **Submenu Breadcrumbs Navigation**
-  - Add visual breadcrumb indicators (e.g., `File > Export > PDF`) for deeply nested submenus.
 
 ---
 
 ## 🔧 Phase 3: Performance, Stability & Edge Cases
 
-- [ ] **Asynchronous D-Bus Extraction with Timeout Protection**
-  - Prevent Rofi interface freezing when querying unresponsive or frozen background applications.
+- [x] **D-Bus Extraction with Timeout Protection**
+  - Added strict timeouts (1.5s on GetLayout, 1.0s on Event, 50ms on discovery) to prevent freezing when querying unresponsive applications.
+- [x] **Deterministic Focus Payload Dispatch**
+  - Encoded `service|object_path|item_id` in Rofi's info field to eliminate focus-loss race conditions on menu item activation.
+- [x] **Qt / GTK / Electron Specific Workarounds**
+  - Scans `/MenuBar/1` through `/MenuBar/8`, `/com/canonical/dbusmenu`, introspects `/MenuBar` dynamically, and resolves parent PIDs for Chromium/Electron renderers.
 - [ ] **Submenu Cache with Invalidation**
   - Cache static menu structures for long-running heavy applications (like GIMP, Inkscape, VS Code) to achieve sub-millisecond render times.
-- [ ] **Qt / GTK / Electron Specific Workarounds**
-  - Handle edge cases where Chromium/Electron apps register menu bars under non-standard D-Bus paths.
 
 ---
 

@@ -1,25 +1,31 @@
 # rofi-wayland-hud
 
-A stable, instant-trigger **Global Menu HUD** for **KDE Plasma 6 on Wayland**, powered by **Rofi**.
+A stable, instant-trigger **Global Menu HUD** for **Wayland** (KDE Plasma 6, Hyprland, Sway), powered by **Rofi**.
 
 ## 🚀 Features
 
 - ⚡ **Instant and non-interactive**  
-  Automatically detects the active window and its PID using `kdotool`, without requiring manual mouse clicks or crosshairs.
+  Automatically detects the active window and its PID without requiring manual mouse clicks or crosshairs.
 
-- 🖥️ **Native Wayland and KDE Plasma 6 support**  
-  Designed to work around Wayland focus limitations and bridge D-Bus menu data into Rofi.
+- 🖥️ **Multi-Compositor Auto-Detection**  
+  Built-in polymorphic tracking support for **KDE Plasma 6** (via `kdotool`), **Hyprland** (via `hyprctl`), and **Sway / wlroots** (via `swaymsg`), automatically detected at runtime.
 
-- 🚄 **High-performance C++ backend**  
-  Written in modern C++ using `sdbus-c++` for fast and reliable D-Bus communication.
+- ⌨️ **Keyboard Shortcut Hints & Search**  
+  Parses native D-Bus menu accelerator combinations (e.g. `Ctrl+S`, `Alt+F4`, `Ctrl+Shift+P`) and renders them alongside menu labels, enabling instant searching by shortcut in Rofi.
 
-- 🎨 **Clean Rofi output formatting**  
-  Provides readable window titles, fallback messages, and application icons.
+- 🎯 **Deterministic Focus Dispatch**  
+  Encodes D-Bus service and object paths directly into Rofi payloads to eliminate focus-switch race conditions when activating actions.
+
+- 🚄 **High-Performance C++20 Backend**  
+  Built using `sdbus-c++` with dynamic `/MenuBar/*` introspection, process hierarchy traversal (PPID for Electron/Chromium), and strict timeouts preventing UI freezes.
+
+- 🎨 **Clean Rofi Output Formatting**  
+  Renders formatted window titles, hierarchical breadcrumbs (`File > Export > PDF`), and application icons.
 
 ## 🗺️ Roadmap & Contributing
 
 Want to see what's planned or contribute to `rofi-wayland-hud`?  
-Check out my **[TODO & Roadmap](TODO.md)** for upcoming features, multi-compositor support, and UI enhancements.
+Check out the **[TODO & Roadmap](TODO.md)** for upcoming features and architectural milestones.
 
 ## 📋 Dependencies
 

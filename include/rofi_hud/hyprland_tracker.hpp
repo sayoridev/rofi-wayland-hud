@@ -6,10 +6,10 @@
 
 namespace rofi_hud {
 
-class KWinTracker : public WindowTracker {
+class HyprlandTracker : public WindowTracker {
 public:
-    KWinTracker();
-    ~KWinTracker() override = default;
+    HyprlandTracker();
+    ~HyprlandTracker() override = default;
 
     std::optional<ActiveWindowInfo> get_active_window_info() override;
 

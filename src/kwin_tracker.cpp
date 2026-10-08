@@ -1,11 +1,8 @@
 #include "rofi_hud/kwin_tracker.hpp"
+#include "rofi_hud/dbus_discovery.hpp"
 #include <iostream>
-#include <cstdio>
-#include <memory>
 #include <array>
-#include <fstream>
-#include <algorithm>
-#include <unistd.h>
+#include <vector>
 
 namespace rofi_hud {
 
@@ -13,94 +10,70 @@ KWinTracker::KWinTracker() {
     try {
         connection_ = sdbus::createSessionBusConnection();
     } catch (const sdbus::Error& e) {
-        std::cerr << "[KWinTracker Error] Connection failed: " << e.what() << std::endl;
+        std::cerr << "[KWinTracker Error] Impossible to connect to Session Bus: " << e.what() << std::endl;
     }
 }
 
 std::optional<ActiveWindowInfo> KWinTracker::get_active_window_info() {
     if (!connection_) return std::nullopt;
 
-    usleep(100000);
+    ActiveWindowInfo info;
 
-    auto exec_cmd = [](const std::string& cmd) -> std::string {
-        std::array<char, 128> buffer;
-        std::string result;
-        std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"), pclose);
-        if (!pipe) return "";
-        while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-            result += buffer.data();
-        }
-        return result;
-    };
-
+    // Recupera PID, titolo e classe della finestra attiva in una singola invocazione di kdotool
     try {
-        // 1. get id and pid of the window from kdotool 
-        std::string wid_str = exec_cmd("kdotool getactivewindow 2>/dev/null");
-        if (wid_str.empty()) return std::nullopt;
+        std::array<char, 256> buffer;
+        FILE* pipe = popen("kdotool getactivewindow getwindowpid %1 getwindowname %1 getwindowclassname %1 2>/dev/null", "r");
+        if (pipe) {
+            std::vector<std::string> lines;
+            while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+                std::string line = buffer.data();
+                line.erase(line.find_last_not_of(" \n\r\t") + 1);
+                lines.push_back(line);
+            }
+            pclose(pipe);
 
-        std::string pid_str = exec_cmd("kdotool getwindowpid " + wid_str + " 2>/dev/null");
-        if (pid_str.empty()) return std::nullopt;
-
-        int32_t active_pid = std::stoi(pid_str);
-        if (active_pid <= 0) return std::nullopt;
-
-        std::ifstream comm_file("/proc/" + std::to_string(active_pid) + "/comm");
-        std::string desktop_file;
-        if (comm_file.is_open()) {
-            std::getline(comm_file, desktop_file);
-            desktop_file.erase(std::remove(desktop_file.begin(), desktop_file.end(), '\n'), desktop_file.end());
-            desktop_file.erase(std::remove(desktop_file.begin(), desktop_file.end(), '\r'), desktop_file.end());
-        }
-
-        if (desktop_file == "kitty" || desktop_file == "konsole" || desktop_file == "alacritty" || desktop_file.empty()) {
-            return std::nullopt;
-        }
-
-        std::string dbus_unique_name;
-        {
-            auto dbus_proxy = sdbus::createProxy(
-                *connection_,
-                sdbus::ServiceName{"org.freedesktop.DBus"},
-                sdbus::ObjectPath{"/org/freedesktop/DBus"}
-            );
-
-            std::vector<std::string> names;
-            dbus_proxy->callMethod("ListNames")
-                      .onInterface("org.freedesktop.DBus")
-                      .storeResultsTo(names);
-
-            for (const auto& name : names) {
-                if (!name.empty() && name[0] == ':') {
-                    try {
-                        uint32_t pid = 0;
-                        dbus_proxy->callMethod("GetConnectionUnixProcessID")
-                                  .onInterface("org.freedesktop.DBus")
-                                  .withArguments(name)
-                                  .storeResultsTo(pid);
-                        
-                        if (pid == static_cast<uint32_t>(active_pid)) {
-                            dbus_unique_name = name;
-                            break;
-                        }
-                    } catch (...) {}
-                }
+            if (!lines.empty() && !lines[0].empty()) {
+                try {
+                    info.pid = static_cast<uint32_t>(std::stoul(lines[0]));
+                } catch (...) {}
+            }
+            if (lines.size() > 1) {
+                info.app_title = lines[1];
+            }
+            if (lines.size() > 2) {
+                info.app_class = lines[2];
             }
         }
+    } catch (...) {}
 
-        if (dbus_unique_name.empty()) {
-            return std::nullopt;
-        }
+    // Fallback: se kdotool con argomenti multipli fallisce nel recuperare il PID, prova il comando base
+    if (info.pid == 0) {
+        try {
+            std::array<char, 128> buffer;
+            FILE* pipe_pid = popen("kdotool getactivewindow getwindowpid 2>/dev/null", "r");
+            if (pipe_pid) {
+                if (fgets(buffer.data(), buffer.size(), pipe_pid) != nullptr) {
+                    std::string pid_str = buffer.data();
+                    pid_str.erase(pid_str.find_last_not_of(" \n\r\t") + 1);
+                    if (!pid_str.empty()) info.pid = static_cast<uint32_t>(std::stoul(pid_str));
+                }
+                pclose(pipe_pid);
+            }
+        } catch (...) {}
+    }
 
-        ActiveWindowInfo info;
-        info.service_name = dbus_unique_name; 
-        info.object_path = "/MenuBar/2"; 
+    if (info.pid == 0) return std::nullopt;
+
+    // Se il titolo è ancora vuoto, usa il nome del processo
+    if (info.app_title.empty()) {
+        info.app_title = DBusDiscovery::get_process_name(info.pid);
+    }
+
+    if (DBusDiscovery::resolve_dbus_menu_for_pid(*connection_, info.pid, info.service_name, info.object_path)) {
         return info;
-
-    } catch (const std::exception& e) {
-        std::cerr << "[KWinTracker Error] " << e.what() << std::endl;
     }
 
     return std::nullopt;
 }
 
-} 
+} // namespace rofi_hud
