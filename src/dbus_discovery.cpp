@@ -42,8 +42,8 @@ std::string DBusDiscovery::resolve_owner_bus_name(sdbus::IConnection& connection
     try {
         auto dbus_proxy = sdbus::createProxy(
             connection,
-            sdbus::ServiceName("org.freedesktop.DBus"),
-            sdbus::ObjectPath("/org/freedesktop/DBus")
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus"
         );
 
         std::vector<std::string> names;
@@ -78,7 +78,7 @@ bool DBusDiscovery::check_path_implements_dbusmenu(sdbus::IConnection& connectio
                                                    const std::string& bus_name,
                                                    const std::string& path) {
     try {
-        auto proxy = sdbus::createProxy(connection, sdbus::ServiceName(bus_name), sdbus::ObjectPath(path));
+        auto proxy = sdbus::createProxy(connection, bus_name, path);
         uint32_t revision = 0;
         sdbus::Struct<int32_t, std::map<std::string, sdbus::Variant>, std::vector<sdbus::Variant>> dummy;
 
@@ -101,8 +101,8 @@ bool DBusDiscovery::check_registrar_for_window(sdbus::IConnection& connection,
     try {
         auto registrar_proxy = sdbus::createProxy(
             connection,
-            sdbus::ServiceName("com.canonical.AppMenu.Registrar"),
-            sdbus::ObjectPath("/com/canonical/AppMenu/Registrar")
+            "com.canonical.AppMenu.Registrar",
+            "/com/canonical/AppMenu/Registrar"
         );
 
         sdbus::ObjectPath path_result;
@@ -183,7 +183,7 @@ bool DBusDiscovery::resolve_dbus_menu_for_pid(sdbus::IConnection& connection,
 
         // 4. Se nessun candidate path ha risposto, prova introspezione di /MenuBar
         try {
-            auto proxy = sdbus::createProxy(connection, sdbus::ServiceName(bus_name), sdbus::ObjectPath("/MenuBar"));
+            auto proxy = sdbus::createProxy(connection, bus_name, "/MenuBar");
             std::string xml;
             proxy->callMethod("Introspect")
                  .onInterface("org.freedesktop.DBus.Introspectable")
