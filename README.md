@@ -1,87 +1,126 @@
-# rofi-wayland-hud
+<div align="center">
 
-A stable, instant-trigger **Global Menu HUD** for **Wayland** (KDE Plasma 6, Hyprland, Sway), powered by **Rofi**.
+# ⚡ rofi-wayland-hud
 
-## 🚀 Features
+**Instant-trigger, Universal Global Menu HUD for Wayland compositors powered by Rofi**
 
-- ⚡ **Instant and non-interactive**  
-  Automatically detects the active window and its PID without requiring manual mouse clicks or crosshairs.
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg?style=for-the-badge&logo=c%2B%2B)](https://en.wikipedia.org/wiki/C%2B%2B20)
+[![Wayland](https://img.shields.io/badge/Wayland-Native-brightgreen.svg?style=for-the-badge&logo=wayland)](https://wayland.freedesktop.org/)
+[![KDE Plasma](https://img.shields.io/badge/KDE%20Plasma-6-1D99F3.svg?style=for-the-badge&logo=kde)](https://kde.org/plasma-desktop/)
+[![Hyprland](https://img.shields.io/badge/Hyprland-Supported-00BFFF.svg?style=for-the-badge&logo=archlinux)](https://hyprland.org/)
+[![Sway](https://img.shields.io/badge/Sway-Supported-FF6600.svg?style=for-the-badge)](https://swaywm.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/sayoridev/rofi-wayland-hud/ci.yml?branch=main&style=for-the-badge&label=Build)](https://github.com/sayoridev/rofi-wayland-hud/actions)
 
-- 🖥️ **Multi-Compositor Auto-Detection**  
-  Built-in polymorphic tracking support for **KDE Plasma 6** (via `kdotool`), **Hyprland** (via `hyprctl`), and **Sway / wlroots** (via `swaymsg`), automatically detected at runtime.
+<br/>
 
+```text
+╭─────────────────────────────────────────────────────────────────────────────╮
+│ HUD [Dolphin]                                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 📁 File > New Tab                                           (Ctrl+Shift+T)  │
+│ 📄 File > Create New > Text File...                                         │
+│ 🔍 Edit > Find...                                           (Ctrl+F)        │
+│ 🖨️  File > Print...                                          (Ctrl+P)        │
+│ ⚙️  Settings > Configure Dolphin...                          (Ctrl+Shift+,)  │
+│ ❓ Help > About Dolphin                                                     │
+╰─────────────────────────────────────────────────────────────────────────────╯
+```
+
+</div>
+
+---
+
+## ✨ Overview
+
+`rofi-wayland-hud` brings macOS / Unity style **Heads-Up Display (HUD) Global Menu searching** to modern Wayland desktops. 
+
+Press a shortcut to bring up a fuzzy-searchable list of all menu bar actions for the currently active window, preview their keyboard shortcuts, and execute them instantly.
+
+---
+
+## 🚀 Key Features
+
+- ⚡ **Zero-Interaction Window Detection**  
+  Detects the active window and process automatically on launch without requiring mouse clicks or crosshair selection.
+- 🖥️ **Multi-Compositor Strategy Pattern**  
+  Polymorphic trackers automatically detect your compositor at runtime:
+  - **KDE Plasma 6** (via `kdotool`)
+  - **Hyprland** (via `hyprctl activewindow -j`)
+  - **Sway / wlroots** (via `swaymsg -t get_tree`)
 - ⌨️ **Keyboard Shortcut Hints & Search**  
-  Parses native D-Bus menu accelerator combinations (e.g. `Ctrl+S`, `Alt+F4`, `Ctrl+Shift+P`) and renders them alongside menu labels, enabling instant searching by shortcut in Rofi.
-
+  Extracts native accelerator strings (e.g. `Ctrl+S`, `Alt+F4`, `Ctrl+Shift+P`) from D-Bus menus, shows them alongside menu actions, and indexes them in Rofi search metadata.
 - 🎯 **Deterministic Focus Dispatch**  
-  Encodes D-Bus service and object paths directly into Rofi payloads to eliminate focus-switch race conditions when activating actions.
+  Encodes target D-Bus service and object paths into Rofi payloads (`service|path|id`), eliminating focus-switch race conditions during action execution.
+- 🚄 **High-Performance C++20 Core**  
+  Powered by `sdbus-c++` with dynamic `/MenuBar/*` introspection, process hierarchy traversal (resolving PPID for Electron / Chromium apps), and strict timeouts to prevent freezing.
+- 🎨 **Clean Breadcrumb Hierarchy**  
+  Formats nested submenus as intuitive breadcrumbs (e.g. `File > Export > PDF`) with application icons.
 
-- 🚄 **High-Performance C++20 Backend**  
-  Built using `sdbus-c++` with dynamic `/MenuBar/*` introspection, process hierarchy traversal (PPID for Electron/Chromium), and strict timeouts preventing UI freezes.
+---
 
-- 🎨 **Clean Rofi Output Formatting**  
-  Renders formatted window titles, hierarchical breadcrumbs (`File > Export > PDF`), and application icons.
+## 🏗️ Architecture
 
-## 🗺️ Roadmap & Contributing
+```mermaid
+flowchart LR
+    A[User Trigger Hotkey] --> B[TrackerFactory]
+    B -->|Detect Compositor| C{Window Tracker}
+    C -->|KDE Plasma| D[KWinTracker]
+    C -->|Hyprland| E[HyprlandTracker]
+    C -->|Sway / wlroots| F[SwayTracker]
+    D & E & F --> G[DBusDiscovery]
+    G -->|Candidate Paths & Introspection| H[DBusMenuClient]
+    H -->|Extract Layout & Shortcuts| I[RofiFormatter]
+    I -->|Rofi Protocol Stream| J[Rofi Wayland]
+    J -->|ROFI_INFO Payload| K[Deterministic Event Dispatch]
+```
 
-Want to see what's planned or contribute to `rofi-wayland-hud`?  
-Check out the **[TODO & Roadmap](TODO.md)** for upcoming features and architectural milestones.
+---
+
+## 📊 Compatibility Matrix
+
+| Compositor | Detection Method | Backend Tool | Status |
+| :--- | :--- | :--- | :---: |
+| **KDE Plasma 6** | `$XDG_CURRENT_DESKTOP` | `kdotool` |  Stable |
+| **Hyprland** | `$HYPRLAND_INSTANCE_SIGNATURE` | `hyprctl` |  Stable |
+| **Sway / wlroots** | `$SWAYSOCK` | `swaymsg` |  Stable |
+
+---
 
 ## 📋 Dependencies
 
-To build and run `rofi-wayland-hud`, you need the following packages:
+| Package | Purpose |
+| :--- | :--- |
+| **`rofi-wayland`** | Rofi with Wayland protocol support |
+| **`sdbus-c++`** | Modern C++ D-Bus library |
+| **`cmake`** & **`gcc`** (or `clang`) | Build system and C++20 compiler |
+| **`kdotool`** | *(Optional)* For KDE Plasma 6 active window detection |
 
-- Rofi with Wayland support, such as `rofi-wayland`
-- `kdotool`
-- `sdbus-c++`
-- CMake
-- GCC or another compatible C++ compiler
+---
 
 ## 📦 Installation
 
-### Arch Linux
+### Arch Linux (PKGBUILD)
 
-This project includes a native `PKGBUILD` for easy installation and package management with `pacman`.
-
-#### Install dependencies
+This repository includes an optimized `PKGBUILD`:
 
 ```bash
+# Install dependencies
 sudo pacman -S --needed base-devel cmake sdbus-cpp rofi-wayland
-paru -S kdotool
-```
+paru -S kdotool  # If on KDE Plasma
 
-#### Build and install
-
-Clone the repository and enter the project directory:
-
-```bash
+# Clone and install
 git clone https://github.com/sayoridev/rofi-wayland-hud.git
 cd rofi-wayland-hud
-```
-
-Build and install the package:
-
-```bash
 makepkg -si
-```
-
-The binary will be installed globally as:
-
-```text
-/usr/bin/rofi_wayland_hud
 ```
 
 ### Fedora
 
-Install the required dependencies:
-
 ```bash
-sudo dnf install cmake gcc-c++ sdbus-c++-devel kdotool rofi
-```
-
-Clone and build the project:
-
-```bash
+sudo dnf install cmake gcc-c++ sdbus-c++-devel rofi
+git clone https://github.com/sayoridev/rofi-wayland-hud.git
+cd rofi-wayland-hud
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 sudo cmake --install build
@@ -89,137 +128,92 @@ sudo cmake --install build
 
 ### Ubuntu / Debian
 
-Install the available dependencies:
-
 ```bash
 sudo apt update
 sudo apt install cmake build-essential libsdbus-c++-dev rofi
-```
-
-> ⚠️ `kdotool` may not be available in the official repositories. If this is the case, install it from source by following the instructions provided by the `kdotool` project.
-
-Then clone and build `rofi-wayland-hud`:
-
-```bash
+git clone https://github.com/sayoridev/rofi-wayland-hud.git
+cd rofi-wayland-hud
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 sudo cmake --install build
 ```
 
-## ⚙️ Usage
+---
 
-### 🧪 Manual testing
+## ⚙️ Compositor Setup & Shortcuts
 
-You can test the HUD directly from a terminal:
+### 1. Launcher Script (`~/launch_hud.sh`)
 
-```bash
-rofi \
-  -modi "hud:rofi_wayland_hud" \
-  -show hud \
-  -show-icons \
-  -theme-str 'window { width: 40em; }'
-```
-
-If everything is configured correctly, Rofi will display the global menu for the currently active window.
-
-## ⌨️ Setting up a global shortcut in KDE Plasma 6
-
-On Wayland, commands launched by KDE global shortcuts may not inherit all the required environment variables automatically.
-
-For this reason, it is recommended to use a wrapper script.
-
-### 1. Create the launcher script
-
-Create a new file in your home directory:
-
-```bash
-nano ~/launch_hud.sh
-```
-
-Add the following content:
+Create a script to ensure the required Wayland and D-Bus environment variables are passed properly:
 
 ```bash
 #!/usr/bin/env bash
 
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
-export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
 
 exec rofi \
   -modi "hud:rofi_wayland_hud" \
   -show hud \
   -show-icons \
-  -theme-str 'window { width: 40em; }'
+  -theme-str 'window { width: 45em; }'
 ```
 
-### 2. Make the script executable
-
+Make it executable:
 ```bash
 chmod +x ~/launch_hud.sh
 ```
 
-### 3. Add the shortcut in KDE Plasma
+---
 
-1. Open **System Settings**.
-2. Go to **Keyboard > Shortcuts**.
-3. Create a new **Custom Shortcut** or **Command Shortcut**.
-4. Set the command to:
+### 2. Binding the Shortcut
 
-   ```text
-   /home/YOUR_USERNAME/launch_hud.sh
-   ```
+#### 🟦 KDE Plasma 6
+1. Open **System Settings** > **Keyboard** > **Shortcuts**.
+2. Click **Add New** > **Command**.
+3. Set the command to: `/home/YOUR_USERNAME/launch_hud.sh`.
+4. Assign your preferred shortcut (e.g. `Alt + Space` or `Super + Space`).
 
-5. Assign your preferred key combination.
-
-### 🛠️ Shortcut troubleshooting
-
-If the shortcut does not work immediately after being configured:
-
-1. Delete the existing shortcut binding.
-2. Recreate the shortcut.
-3. Assign the key combination again.
-
-This may be necessary to force KDE Plasma and `kglobalaccel` to refresh the command execution context.
-
-## 🐛 Troubleshooting
-
-### Rofi cannot find the HUD mode
-
-Check whether the binary is installed and available in your `PATH`:
-
-```bash
-command -v rofi_wayland_hud
+#### 🟨 Hyprland (`~/.config/hypr/hyprland.conf`)
+```ini
+bind = $mainMod, Space, exec, ~/launch_hud.sh
 ```
 
-You can also run it using the absolute path:
+#### 🟩 Sway (`~/.config/sway/config`)
+```ini
+bindsym $mod+Space exec ~/launch_hud.sh
+```
+
+---
+
+## 🧪 Manual Terminal Testing
+
+Run directly from your terminal:
 
 ```bash
 rofi \
-  -modi "hud:$(command -v rofi_wayland_hud)" \
-  -show hud
+  -modi "hud:rofi_wayland_hud" \
+  -show hud \
+  -show-icons \
+  -theme-str 'window { width: 42em; }'
 ```
 
-### The D-Bus menu is not displayed
+---
 
-Make sure that:
+## 🛠️ Troubleshooting
 
-- the active application exposes a D-Bus menu;
-- `kdotool` is installed and working correctly;
-- the script is executed inside the correct graphical session;
-- `DBUS_SESSION_BUS_ADDRESS` points to the current session bus.
+> [!TIP]
+> **No menu items appearing?**  
+> Ensure the target application exports a D-Bus menu. For Qt apps, ensure `appmenu-gtk-module` or KDE global menu daemon (`kded6`) is running. For Chromium / Electron apps, enable Wayland flags: `--ozone-platform=wayland --enable-features=GlobalShortcutsPortal`.
 
-### `WAYLAND_DISPLAY` is incorrect
+> [!NOTE]
+> **Rofi mode not found?**  
+> If `rofi` cannot locate `rofi_wayland_hud` in your `PATH`, use the absolute path in `-modi`:  
+> `rofi -modi "hud:$(which rofi_wayland_hud)" -show hud`
 
-Check the current Wayland display:
-
-```bash
-echo "$WAYLAND_DISPLAY"
-```
-
-If the value is different from `wayland-0`, update the variable in the wrapper script accordingly.
+---
 
 ## 📄 License
 
-This project is distributed under the terms of the **MIT License**.
-
-See the [`LICENSE`](LICENSE) file for more information.
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.

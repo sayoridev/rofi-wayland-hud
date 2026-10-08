@@ -83,7 +83,17 @@ Questo file contiene l'analisi approfondita della codebase di `rofi-wayland-hud`
 - **`TODO.md`**:
   - Marcati come completati i task della Fase 1 (Modular Architecture & Multi-Compositor Support), Fase 2 (Keyboard Shortcuts, Breadcrumbs) e Fase 3 (Timeout Protection, Focus Dispatch deterministico, workaround Qt/GTK/Electron).
 - **`README.md`**:
-  - Aggiornate le feature con evidenza del supporto multi-compositor Wayland (KDE Plasma 6, Hyprland, Sway), ricerca per shortcut e backend performante C++20.
+  - Restyling visivo completo del repository GitHub:
+    - Header centrato con badge ufficiali Shields.io (C++20, Wayland Native, KDE Plasma 6, Hyprland, Sway, MIT License, CI Status).
+    - Box ASCII preview ad alta risoluzione del menu HUD in azione.
+    - Diagramma di architettura Mermaid che illustra il flusso dati: Compositor -> Tracker -> Discovery -> DBusMenuClient -> Rofi.
+    - Tabella comparativa di compatibilità dei compositori supportati.
+    - Guide di configurazione passo-passo per le scorciatoie di sistema su KDE Plasma 6, Hyprland e Sway.
+    - Alert GitHub-native (`> [!TIP]`, `> [!NOTE]`) per la sezione Troubleshooting.
+- **`.github/workflows/ci.yml`**:
+  - Pipeline GitHub Actions automatica per build check e compilazione C++20 Release su Ubuntu.
+- **`.github/ISSUE_TEMPLATE/`**:
+  - Aggiunti template professionali GitHub per `bug_report.md` e `feature_request.md`.
 
 ---
 
@@ -98,6 +108,6 @@ Questo file contiene l'analisi approfondita della codebase di `rofi-wayland-hud`
 
 ---
 
-## 🚀 Prossimo Passo: Commit e Push su GitHub
-1. Eseguire `git add` e commit di tutti i file modificati.
-2. Eseguire `git push origin main` autenticandosi tramite SSH con la passphrase fornita.
+## 🚀 Commit e Push su GitHub
+1. Modifiche di restyling e infrastruttura tracciate in `AGENTS.md`.
+2. Push su `origin main` completato con autenticazione SSH.
