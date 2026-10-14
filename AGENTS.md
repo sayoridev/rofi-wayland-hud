@@ -1,113 +1,141 @@
-# AGENTS.md — Registro Modifiche e Note di Sviluppo
+# AGENTS.md — Operational Guide
 
-Questo file contiene l'analisi approfondita della codebase di `rofi-wayland-hud`, la traccia di tutte le problematiche riscontrate e il registro dettagliato di ogni modifica apportata.
-
----
-
-## 🔍 Analisi Approfondita della Codebase e Problemi Riscontrati
-
-### 1. Bug Critico nel Formattatore Rofi (`RofiFormatter`)
-- **Problema:** L'implementazione utilizzava stringhe letterali formattate come `std::cout << "\0prompt\x1fHUD [" ...` e `std::cout << "\0message\x1f" ...`.
-- **Causa tecnica:** In C++, le stringhe C letterali che iniziano con il byte nullo `\0` hanno lunghezza nulla per i puntatori a caratteri (`strlen == 0`). Quando passate all'operatore di stream `std::operator<<(std::ostream&, const char*)`, lo stream si ferma immediatamente al primo carattere terminatore `\0`.
-- **Effetto:** Rofi non riceveva mai i comandi di controllo del protocollo script (`\0prompt`, `\0message`). Il prompt risultava vuoto e i messaggi di errore venivano stampati a video come normale testo non formattato anziché come banner message di Rofi.
-- **Soluzione:** Scrivere esplicitamente il byte nullo (`std::cout << '\0'` o `std::cout.put('\0')`) prima del nome del comando di controllo. Risolto inoltre il warning di compilazione sulla sequenza esadecimale non valida (`\x1f` unito alla lettera successiva) introducendo una costante tipizzata `constexpr char DELIM = '\x1f'`.
-
-### 2. Mancata Rilevazione dei Menu D-Bus per Applicazioni Qt/KDE (`KWinTracker` & D-Bus Discovery)
-- **Problema:** L'elenco `candidate_paths` in `kwin_tracker.cpp` conteneva unicamente:
-  `{"/MenuBar/1", "/com/canonical/dbusmenu", "/org/ayatana/NotificationItem/MenuBar", "/org/gtk/menus"}`.
-- **Causa tecnica:** Le applicazioni Qt/KDE (come ad esempio Dolphin) creano le barre dei menu dinamicamente con indici incrementali `/MenuBar/2`, `/MenuBar/3`, ecc. Dolphin sulla sessione corrente risponde sul path `/MenuBar/2`. Poiché tale percorso non era incluso tra i candidati e la chiamata a `com.canonical.AppMenu.Registrar` falliva/andava in timeout su Wayland (il registrar Canonical è progettato per gli X11 Window ID e non gestisce PID su Wayland puro), il programma non rilevava mai il menu di Dolphin, restituendo l'errore `Impossible to detect D-BUS menu for the active window`.
-- **Soluzione:** 
-  1. Estesa la scansione a tutti i percorsi `/MenuBar/1` fino a `/MenuBar/8` e percorsi noti.
-  2. Implementata introspezione D-Bus dinamica su `/MenuBar` con parsing regex dei nodi XML per scoprire automaticamente qualsiasi indice `/MenuBar/<N>`.
-  3. Gestione dei processi figli / renderer (Electron, Chromium) risalendo ricorsivamente al PPID da `/proc/<pid>/status`.
-
-### 3. Race Condition nella Selezione dell'Azione Rofi (`main.cpp`)
-- **Problema:** Quando Rofi esegue il secondo step con `ROFI_RETV=1` per azionare l'elemento selezionato dall'utente, il codice invocava nuovamente `tracker.get_active_window_info()`.
-- **Causa tecnica:** Su Wayland con layer-shell, al momento della selezione la finestra attiva può cambiare focus o chiudersi, causando il fallimento o l'attivazione sulla finestra sbagliata.
-- **Soluzione:** Codificare nel campo `info` di Rofi sia il servizio D-Bus, sia il percorso dell'oggetto, sia l'ID dell'azione (`service|object_path|item_id`). Al rientro con `ROFI_RETV=1`, il dispatch dell'evento avviene in modo deterministico e istantaneo senza dover re-interrogare il compositor.
-
-### 4. Scorciatoie da Tastiera non Supportate (`DBusMenuClient`)
-- **Problema:** `DBusMenuClient` richiedeva `"shortcut"` a D-Bus ma non estraeva né formattava il tipo `aas` (array di array di stringhe) restituito da `com.canonical.dbusmenu`.
-- **Soluzione:** Aggiunto il parser per `std::vector<std::vector<std::string>>`, la normalizzazione dei tasti modificatori (`Control` -> `Ctrl`, ecc.) e l'inclusione delle scorciatoie sia nel testo mostrato sia nei metadati di ricerca (`\x1fmeta\x1f`).
-
-### 5. Architettura Monolitica vs Strategy Pattern per Multi-Compositor
-- **Problema:** Il tracker era strettamente accoppiato a `kdotool` e KDE Plasma.
-- **Soluzione:** Introduzione di `WindowTracker` astratto (pattern Strategy), `TrackerFactory` con rilevamento automatico del compositore (`KWinTracker`, `HyprlandTracker`, `SwayTracker`).
-
-### 6. Configurazione Build e Packaging
-- **`PKGBUILD`:** URL del progetto errato (`https://github.com/tuonome/rofi-wayland-hud` sostituito con `https://github.com/sayoridev/rofi-wayland-hud`) e auto-conflitto rimosso.
-- **`CMakeLists.txt`:** Utilizzo moderno di `target_include_directories` e flag di warning unificati.
+Technical operational guide for human contributors and AI agents working on
+`rofi-wayland-hud`. It documents the **intended** architecture, the rules that
+keep it healthy, and the day-to-day workflows. For the deep module-by-module
+design documentation, see [docs/architecture.md](docs/architecture.md).
 
 ---
 
-## 📝 Registro Dettagliato delle Modifiche Eseguite
+## 1. Project Overview
 
-### 1. File Creati:
-- **`include/rofi_hud/window_tracker.hpp`**: Interfaccia base astratta per il tracking delle finestre e definizione della struct `ActiveWindowInfo` (con campi `service_name`, `object_path`, `app_title`, `app_class`, `pid`).
-- **`include/rofi_hud/dbus_discovery.hpp`** & **`src/dbus_discovery.cpp`**: Modulo centralizzato e performante per:
-  - Risoluzione del bus D-Bus proprietario da PID (`resolve_owner_bus_name`).
-  - Scansione intelligente dei percorsi menu (`/MenuBar/1` .. `/MenuBar/8`, `/com/canonical/dbusmenu`, ecc.).
-  - Introspezione dinamica di `/MenuBar` per catturare qualsiasi sotto-nodo Qt/KDE.
-  - Risoluzione PPID per Chromium/Electron.
-  - Timeout di sicurezza su tutte le chiamate D-Bus (50ms) per garantire zero latenza.
-- **`include/rofi_hud/hyprland_tracker.hpp`** & **`src/hyprland_tracker.cpp`**: Tracker per Hyprland basato su `hyprctl activewindow -j`.
-- **`include/rofi_hud/sway_tracker.hpp`** & **`src/sway_tracker.cpp`**: Tracker per Sway/wlroots basato su `swaymsg -t get_tree`.
-- **`include/rofi_hud/tracker_factory.hpp`** & **`src/tracker_factory.cpp`**: Factory automatica con prioritizzazione e auto-detection del compositore Wayland attivo (`HYPRLAND_INSTANCE_SIGNATURE`, `SWAYSOCK`, `XDG_CURRENT_DESKTOP`, fallback su KWin).
+`rofi-wayland-hud` is a C++20 Rofi script-mode plugin that renders a searchable
+HUD of the global menu (D-Bus `com.canonical.dbusmenu`) exported by the
+currently focused Wayland window. Supported compositors: KDE Plasma 6
+(`kdotool`), Hyprland (`hyprctl`), Sway/wlroots (`swaymsg`).
 
-### 2. File Aggiornati e Bug Fixati:
-- **`include/rofi_hud/kwin_tracker.hpp`**: Aggiornato per ereditare da `WindowTracker`.
-- **`src/kwin_tracker.cpp`**: Aggiornato per recuperare `pid`, `title` e `class` da `kdotool getactivewindow getwindowpid %1 getwindowname %1 getwindowclassname %1` in una singola chiamata senza fork multipli, con fallback su `DBusDiscovery::get_process_name`.
-- **`include/rofi_hud/dbus_menu_client.hpp`** & **`src/dbus_menu_client.cpp`**:
-  - Aggiunto parsing completo di scorciatoie da tastiera D-Bus (`aas` -> `Ctrl+Shift+...`).
-  - Timeout di sicurezza (1.5s su `GetLayout`, 1.0s su `Event`) per evitare blocchi dell'interfaccia.
-  - Pulizia label preservando sequenze escape `&&` e `__`.
-  - Filtro degli elementi di tipo `separator` e non visibili.
-- **`include/rofi_hud/rofi_formatter.hpp`** & **`src/rofi_formatter.cpp`**:
-  - Correzione del bug critico del byte nullo `\0` in `\0prompt` e `\0message`.
-  - Rimozione del warning del compilatore per escape hex sequence fuori range tramite `constexpr char DELIM = '\x1f'`.
-  - Integrazione delle scorciatoie da tastiera nel testo visualizzato e nei metadati `meta` per ricerca rapida.
-  - Codifica deterministica `service|object_path|item_id` in `info` per eliminare qualsiasi race condition di focus al click.
-- **`src/main.cpp`**:
-  - Integrazione di `TrackerFactory::create_tracker()`.
-  - Parsing del payload `service|object_path|item_id` con dispatch immediato dell'azione selezionata.
-- **`CMakeLists.txt`**:
-  - Aggiunti tutti i nuovi sorgenti C++ al target `rofi_hud_core`.
-  - Configurato `target_include_directories` moderno e flag `-Wall -Wextra -Wpedantic` sia su libreria sia sull'eseguibile.
-- **`AGENTS.md`**:
-  - Documentazione completa di analisi, architettura, modifiche e bugfix.
+- **Language:** C++20, no external dependencies except `sdbus-c++`.
+- **Build:** CMake >= 3.20.
+- **Binary:** `rofi_wayland_hud` (installed to `bin/`, invoked by Rofi).
+- The core library `rofi_hud_core` (alias `rofi_hud::core`) is **internal**;
+  it is not installed and has no stable public API.
 
-- **`PKGBUILD`**:
-  - Corretto URL del repository (`https://github.com/sayoridev/rofi-wayland-hud`).
-  - Rimossa auto-dipendenza / self-conflict `conflicts=('rofi-wayland-hud')`.
-  - Aggiunti `optdepends` per i diversi compositori (`kdotool`, `hyprland`, `sway`).
-- **`TODO.md`**:
-  - Marcati come completati i task della Fase 1 (Modular Architecture & Multi-Compositor Support), Fase 2 (Keyboard Shortcuts, Breadcrumbs) e Fase 3 (Timeout Protection, Focus Dispatch deterministico, workaround Qt/GTK/Electron).
-- **`README.md`**:
-  - Restyling visivo completo del repository GitHub:
-    - Header centrato con badge ufficiali Shields.io (C++20, Wayland Native, KDE Plasma 6, Hyprland, Sway, MIT License, CI Status).
-    - Box ASCII preview ad alta risoluzione del menu HUD in azione.
-    - Diagramma di architettura Mermaid che illustra il flusso dati: Compositor -> Tracker -> Discovery -> DBusMenuClient -> Rofi.
-    - Tabella comparativa di compatibilità dei compositori supportati.
-    - Guide di configurazione passo-passo per le scorciatoie di sistema su KDE Plasma 6, Hyprland e Sway.
-    - Alert GitHub-native (`> [!TIP]`, `> [!NOTE]`) per la sezione Troubleshooting.
-- **`.github/workflows/ci.yml`**:
-  - Pipeline GitHub Actions automatica per build check e compilazione C++20 Release su Ubuntu.
-- **`.github/ISSUE_TEMPLATE/`**:
-  - Aggiunti template professionali GitHub per `bug_report.md` e `feature_request.md`.
+## 2. Target Architecture
 
----
+Layered module structure under `include/rofi_hud/` and `src/`:
 
-## 🛠️ Verifica Compilazione e Test
-- Compilazione eseguita con CMake:
-  - Standard C++20, flag `-Wall -Wextra -Wpedantic`.
-  - Nessun errore, nessun warning residuo.
-  - Generazione dell'eseguibile `rofi_wayland_hud` e della libreria `librofi_hud_core.a`.
-- Test funzionali:
-  - Output formattato correttamente secondo il protocollo script Rofi (byte nullo `\0` seguito da prompt o message).
-  - Rilevamento automatico delle scorciatoie da tastiera e supporto deterministico al clic.
+| Module | Responsibility | May depend on |
+| :--- | :--- | :--- |
+| `core/` | Domain types (`ActiveWindowInfo`, `FlatMenuItem`), `WindowTracker` interface, `CompositorTracker` base | platform |
+| `platform/` | OS/toolkit-free helpers: `process_runner`, `string_utils`, `json_field`, `log` | — (leaf layer) |
+| `dbus/` | D-Bus concerns: `DBusDiscovery` (menu coordinates resolution), `DBusMenuClient` (dbusmenu protocol), `menu_text`, `timeouts` | platform |
+| `compositors/` | `KWinTracker`, `HyprlandTracker`, `SwayTracker`, `TrackerFactory` | core, platform, dbus |
+| `rofi/` | Rofi boundary: `RofiProtocol` (env vars + `service|path|id` payload codec), `RofiFormatter` (script-mode output) | core, platform |
 
----
+**Dependency rules (enforced by review):**
 
-## 🚀 Commit e Push su GitHub
-1. Modifiche di restyling e infrastruttura tracciate in `AGENTS.md`.
-2. Push su `origin main` completato con autenticazione SSH.
+- `platform` depends on nothing inside the project (leaf layer).
+- `core` depends only on `platform`.
+- `dbus` and `compositors` depend on `core` + `platform` (+ `dbus` for compositors).
+- `rofi` depends only on `core` + `platform`.
+- `main.cpp` is the only composition root and may include any module.
+- Dependencies between peer modules (e.g. `rofi` -> `dbus`) are **prohibited**;
+  communicate through `core` types or function arguments.
+
+## 3. Coding Conventions
+
+- All code, identifiers, comments and documentation are written in **English**.
+- One class per header; free functions for stateless logic (see `menu_text`,
+  `string_utils`, `json_field`).
+- No `using namespace` in headers or sources; always qualify (`rofi_hud::log`).
+- Error handling:
+  - Never let exceptions escape `main()`; catch `sdbus::Error` where the
+    original code did and log via `rofi_hud::log`.
+  - Parsing helpers must be **no-throw** and must not partially modify their
+    outputs on failure (see `parse_uint32`).
+  - `catch (...)` is allowed only where the original code silenced errors by
+    design (D-Bus probes); add a comment explaining what is being ignored.
+
+## 4. Hard Constraints
+
+1. **No new external dependencies.** JSON is parsed with `std::regex`
+   (`platform/json_field.hpp`) because a real JSON parser is forbidden; the
+   assumptions are documented there and in docs/architecture.md.
+2. **stdout carries only the Rofi protocol.** Log exclusively through
+   `rofi_hud::log`, which writes to stderr.
+3. **stderr is user-visible:** in Rofi script-mode, stderr lines are rendered by
+   Rofi as message entries. Keep stderr output concise and stable; error
+   message formats are part of the observable behavior.
+4. **Behavior preservation over cosmetics.** Refactorings must not change the
+   emitted protocol bytes, the detection order of strategies, or D-Bus timeouts
+   (`dbus/timeouts.hpp`).
+
+## 5. Prohibited Patterns
+
+- Adding a JSON library, process library, or test framework.
+- Printing to `std::cout` from anywhere except `RofiFormatter`.
+- `system()` calls; use `platform::run_command`.
+- Bare `popen`/`fgets` outside `process_runner.cpp`.
+- Magic timeout values outside `dbus/timeouts.hpp`.
+- `std::stoi`/`std::stoul` on unvalidated input; use `parse_uint32`.
+- Compositor-specific logic outside `compositors/`.
+
+## 6. Build & Test Workflow
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure   # unit tests (tests/, zero-dep framework)
+```
+
+Useful options: `-DROFI_HUD_BUILD_TESTS=OFF`, `-DROFI_HUD_WARNINGS_AS_ERRORS=ON`.
+
+Formatting: `.clang-format` (LLVM base, 4-space indent, 100 columns). Run
+`clang-format -i` on touched files before committing.
+
+CI (`.github/workflows/ci.yml`) builds Release and runs `ctest` on Ubuntu.
+
+## 7. Testing Policy
+
+- Tests live in `tests/`, use the self-contained framework in
+  `tests/test_framework.hpp` (`TEST_CASE`, `CHECK`, `CHECK_EQ`, one `TEST_MAIN`
+  in `tests/test_main.cpp`), and link `rofi_hud::core`.
+- Every pure helper (platform layer, `menu_text`, `rofi_protocol`) must have
+  unit tests. D-Bus-facing code is verified manually (see docs/architecture.md
+  section "Manual verification").
+- Regressions found during refactoring become new test cases.
+
+## 8. Refactoring Changelog
+
+2026-10-14 — Full repository refactoring (all phases approved by maintainer):
+
+- **Repository hygiene:** removed committed build trees (`build/`, `src/build/`),
+  binaries and the prebuilt package tarball.
+- **New layered structure** (`core/`, `platform/`, `dbus/`, `compositors/`,
+  `rofi/`) replacing the flat layout; internal include path `rofi_hud/<layer>/…`.
+- **Platform layer extracted:** `run_command` (RAII popen), `trim` /
+  `parse_uint32` / `split_lines`, `json_field` regex helpers (with the sway
+  lookback-window assumption documented), centralized `log` (stderr, level-gated).
+- **Tracker deduplication:** new `CompositorTracker` base owning the D-Bus
+  session connection and the common menu-resolution tail; the three trackers now
+  implement only `detect_active_window()`. Stderr messages kept byte-compatible.
+- **D-Bus layer:** `resolve_dbus_menu_for_pid` split into named steps
+  (registrar / owner bus name / known paths / `/MenuBar` introspection); timeouts
+  centralized in `dbus/timeouts.hpp` (same values); label cleaning and shortcut
+  formatting extracted to `dbus/menu_text.hpp` as pure, tested functions.
+- **Rofi layer + main:** new `RofiProtocol` (`SelectionPayload` codec +
+  `read_rofi_request`); `main.cpp` reduced to pure orchestration.
+- **Tests:** 20 unit test cases (70 checks) for the pure helpers; CTest
+  integration; CI runs the suite.
+- **Docs:** this guide rewritten in English; deep design docs added under
+  `docs/`; TODO.md updated.
+
+### Behavioral changes (approved)
+
+- Removed the legacy numeric-only `ROFI_INFO` fallback in `main.cpp` (dead code:
+  the formatter always encodes the full `service|path|id` payload).
+- Removed the unused nested `MenuItem` tree struct and the unused 2-arg
+  `render_menu` overload.
+- `SelectionPayload::decode` now rejects ids with trailing garbage (previously
+  `std::stoi` silently accepted a numeric prefix).
+- `parse_uint32` rejects values > UINT32_MAX (previously `stoul` truncated).

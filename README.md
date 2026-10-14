@@ -64,13 +64,11 @@ Press a shortcut to bring up a fuzzy-searchable list of all menu bar actions for
 ```mermaid
 flowchart LR
     A[User Trigger Hotkey] --> B[TrackerFactory]
-    B -->|Detect Compositor| C{Window Tracker}
-    C -->|KDE Plasma| D[KWinTracker]
-    C -->|Hyprland| E[HyprlandTracker]
-    C -->|Sway / wlroots| F[SwayTracker]
+    B --> C[CompositorTracker base]
+    C --> D[KWinTracker] & E[HyprlandTracker] & F[SwayTracker]
     D & E & F --> G[DBusDiscovery]
     G -->|Candidate Paths & Introspection| H[DBusMenuClient]
-    H -->|Extract Layout & Shortcuts| I[RofiFormatter]
+    H -->|Extract Layout & Shortcuts| I[RofiFormatter + RofiProtocol]
     I -->|Rofi Protocol Stream| J[Rofi Wayland]
     J -->|ROFI_INFO Payload| K[Deterministic Event Dispatch]
 ```
@@ -211,6 +209,19 @@ rofi \
 > **Rofi mode not found?**  
 > If `rofi` cannot locate `rofi_wayland_hud` in your `PATH`, use the absolute path in `-modi`:  
 > `rofi -modi "hud:$(which rofi_wayland_hud)" -show hud`
+## 🛠️ Development
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+The codebase is organized in layers (`core/`, `platform/`, `dbus/`,
+`compositors/`, `rofi/`) with strict dependency rules. The operational guide for
+contributors and AI agents — architecture, conventions, constraints and testing
+policy — lives in [AGENTS.md](AGENTS.md); deep module-by-module protocol
+documentation lives in [docs/architecture.md](docs/architecture.md).
 
 ---
 

@@ -1,65 +1,56 @@
-# 📌 Project Roadmap & TODO List — `rofi-wayland-hud`
+# Project Roadmap & TODO List — `rofi-wayland-hud`
 
-This document outlines planned features, structural improvements, and platform support extensions for `rofi-wayland-hud`.
+## Refactoring (2026-10-14) — COMPLETED
 
----
+- [x] Repository hygiene: removed committed build trees, binaries, package tarball.
+- [x] Layered architecture: `core/`, `platform/`, `dbus/`, `compositors/`, `rofi/`.
+- [x] Platform layer: `process_runner`, `string_utils`, `json_field`, `log`.
+- [x] Tracker deduplication via `CompositorTracker` base class.
+- [x] D-Bus layer: named discovery steps, centralized timeouts, `menu_text` helpers.
+- [x] Rofi layer: `RofiProtocol` payload codec; `main.cpp` as composition root.
+- [x] Unit test suite (20 cases / 70 checks) + CTest + CI integration.
+- [x] Documentation: `AGENTS.md` (operational guide), `docs/architecture.md`,
+      README architecture/development sections; all docs and comments in English.
 
-## 🏎️ Phase 1: Modular Architecture & Multi-Compositor Support
-> *Goal: Abstract the window tracking mechanism so the HUD works seamlessly across various Wayland compositors beyond KDE Plasma.*
+### Behavioral changes logged in AGENTS.md (approved by maintainer)
 
-- [x] **Refactor `WindowTracker` to Polymorphic Strategy Pattern**
-  - Defined abstract C++ base class `WindowTracker`.
-  - Moved and optimized `kdotool` implementation into `KWinTracker : public WindowTracker`.
-- [x] **Implement Hyprland Support**
-  - Created `HyprlandTracker` using `hyprctl activewindow -j` for active window PID, class, and title extraction.
-- [x] **Implement Sway / wlroots Support**
-  - Created `SwayTracker` using `swaymsg -t get_tree` IPC socket calls.
-- [x] **Automatic Compositor Auto-Detection**
-  - Created `TrackerFactory` checking `$HYPRLAND_INSTANCE_SIGNATURE`, `$SWAYSOCK`, and `$XDG_CURRENT_DESKTOP` at startup to dynamically instantiate the appropriate tracker.
+- [x] Removed dead numeric-only `ROFI_INFO` fallback in `main.cpp`.
+- [x] Removed unused `MenuItem` tree struct and unused `render_menu` overload.
+- [x] Stricter payload id parsing; stricter uint32 parsing.
 
----
+### Technical notes (non-obvious decisions)
 
-## 🎨 Phase 2: User Experience & Customization
-
-- [x] **Keyboard Shortcut Hints in Rofi Menu**
-  - Parsed D-Bus menu accelerator strings (e.g., `Ctrl+S`, `Alt+F4`, `Ctrl+Shift+P`) and displayed them formatted alongside the entry name, with searchable `meta` tags.
-- [x] **Submenu Breadcrumbs Navigation**
-  - Implemented visual breadcrumb indicators (e.g., `File > Export > PDF`) for nested submenus.
-- [ ] **Enhanced Application Icon Resolution**
-  - Fallback icon matching using `.desktop` files when D-Bus doesn't provide an explicit icon name.
-- [ ] **Config File Support (`~/.config/rofi-hud/config.ini` or `.json`)**
-  - Allow users to configure default parameters without wrapping Rofi commands:
-    - Custom Rofi theme overrides.
-    - Ignored application blacklists (e.g., ignore Desktop background or Panels).
-    - Custom fallback message text.
+- JSON stays regex-based (`platform/json_field.hpp`) — no external deps allowed.
+  The sway lookback window (1 KB back / 2 KB wide from `"focused"`) relies on
+  sway's stable field serialization order (pid/name/app_id precede `focused`).
+- `log` writes to stderr only; stderr is rendered by Rofi — message formats are
+  behavioral surface, kept stable.
+- `split_lines` preserves empty lines to keep pid/title/class alignment
+  identical to the original `fgets` collection.
+- `parse_uint32` parses into a local because `std::from_chars` partially writes
+  the destination on failure.
 
 ---
 
-## 🔧 Phase 3: Performance, Stability & Edge Cases
+## Feature Roadmap (unchanged, from the original plan)
 
-- [x] **D-Bus Extraction with Timeout Protection**
-  - Added strict timeouts (1.5s on GetLayout, 1.0s on Event, 50ms on discovery) to prevent freezing when querying unresponsive applications.
-- [x] **Deterministic Focus Payload Dispatch**
-  - Encoded `service|object_path|item_id` in Rofi's info field to eliminate focus-loss race conditions on menu item activation.
-- [x] **Qt / GTK / Electron Specific Workarounds**
-  - Scans `/MenuBar/1` through `/MenuBar/8`, `/com/canonical/dbusmenu`, introspects `/MenuBar` dynamically, and resolves parent PIDs for Chromium/Electron renderers.
-- [ ] **Submenu Cache with Invalidation**
-  - Cache static menu structures for long-running heavy applications (like GIMP, Inkscape, VS Code) to achieve sub-millisecond render times.
+### Phase 2: User Experience & Customization
 
----
+- [ ] Enhanced application icon resolution (`.desktop` fallback when D-Bus
+      provides no icon name).
+- [ ] Config file support (`~/.config/rofi-hud/config.ini` or `.json`): theme
+      overrides, ignored-app blacklist, custom fallback message.
 
-## 📦 Phase 4: Distribution & Packaging
+### Phase 3: Performance, Stability & Edge Cases
 
-- [ ] **AUR (Arch User Repository) Publishing**
-  - Submit `rofi-wayland-hud` and `rofi-wayland-hud-git` to PKGBUILD repositories.
-- [ ] **Fedora / COPR RPM Repository**
-  - Create `.spec` file and set up COPR build pipeline for easy installation on Fedora Workstation & Kinoite.
-- [ ] **Distrobox Setup Helper Script**
-  - Provide an automated one-line setup script for users on immutable operating systems (Fedora Kinoite, SteamOS, openSUSE MicroOS).
-- [ ] **GitHub Actions CI/CD**
-  - Set up automated CMake build checks and linting for pull requests.
+- [ ] Submenu cache with invalidation for long-running heavy applications
+      (GIMP, Inkscape, VS Code) to reach sub-millisecond render times.
+- [ ] (idea) Unit tests for D-Bus-facing code behind an interface seam, once a
+      mock strategy is designed.
 
----
+### Phase 4: Distribution & Packaging
 
-## 💡 Community Ideas & Notes
-*Have an idea or feature request? Feel free to open an issue or submit a pull request on GitHub!*
+- [ ] AUR publishing (`rofi-wayland-hud`, `rofi-wayland-hud-git`).
+- [ ] Fedora / COPR RPM repository (`.spec` + COPR pipeline).
+- [ ] Distrobox setup helper script for immutable distros.
+- [x] GitHub Actions CI (build + ctest) — done during refactoring.
